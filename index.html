@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="css/reset.css" />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@300&display=swap"
+      rel="stylesheet"
+    />
+    <title>MyMap</title>
+  </head>
+  <body>
+    <header>
+      <h1>My Map</h1>
+      <p>位置情報を登録してみよう</p>
+    </header>
+    <div class="searchbox">
+      <input type="text" id="searchWord" placeholder="bingsmapを検索する" />
+      <button id="search">検索</button>
+    </div>
+
+    <div
+      id="myMap"
+      style="position: relative; width: 100%; height: 450px"
+    ></div>
+    <div class="infoboxForm" id="infoboxForm">
+      <div class="modalbg modalclose"></div>
+      <div class="modalcontents">
+        <table>
+          <tr>
+            <th>Location Name</th>
+            <td><input type="text" id="titleText" size="25"/></td>
+          </tr>
+          <tr>
+            <th>Description</th>
+            <td><input type="text" id="descText" size="25" /></td>
+          </tr>
+          <tr>
+            <td colspan="2"><button id="register">登録</button></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- The core Firebase JS SDK is always required and must be listed first -->
+    <script src="https://www.gstatic.com/firebasejs/8.3.0/firebase.js"></script>
+
+    <!-- TODO: Add SDKs for Firebase products that you want to use
+     https://firebase.google.com/docs/web/setup#available-libraries -->
+
+    <script>
+      // Your web app's Firebase configuration
+      var firebaseConfig = {
+        apiKey: "AIzaSyDxjXLmZVzhHxeoPZ1PzMdD78FUf0-KJHw",
+        authDomain: "gs04-map.firebaseapp.com",
+        projectId: "gs04-map",
+        storageBucket: "gs04-map.appspot.com",
+        messagingSenderId: "1095577960077",
+        appId: "1:1095577960077:web:094302b355754943502cc4",
+      };
+      // Initialize Firebase
+      firebase.initializeApp(firebaseConfig);
+      const ref = firebase.database().ref();
+    </script>
+
+    <!-- jQuery&GoogleMapsAPI -->
+    <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+    <!-- /jQuery&GoogleMapsAPI -->
+
+    <!-- [ infobox Object ] https://msdn.microsoft.com/en-us/library/mt712658.aspx -->
+    <script
+      src="https://www.bing.com/api/maps/mapcontrol?callback=GetMap&key=AtLexhE04gA78xqV4-kE0lUyx4GchoHCwCs48WY0gTMsLSgDk4dD-Z0gE4jmKAC1"
+      async
+      defer
+    ></script>
+
+    <script>
+      let map, pin, infobox, searchManager;
+
+      ///位置情報の取得に成功した時の処理
+      function mapsInit(position) {
+        //lat=緯度、lon=経度 を取得
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        map = new Microsoft.Maps.Map("#myMap", {
+          center: new Microsoft.Maps.Location(lat, lon), //Centerを現在地に指定
+          mapTypeId: Microsoft.Maps.MapTypeId.load, //Typeを定義
+          zoom: 15, //Zoom:1=zoomOut, 20=zoomUp[ 1~20 ]
+        });
+        // center：現在地にPinをたてる
+        pin = new Microsoft.Maps.Pushpin(map.getCenter());
+        map.entities.push(pin);
+        // infobox作成
+        infobox = new Microsoft.Maps.Infobox(map.getCenter(), {
+          visible: false, //非表示設定
+          autoAlignment: true,
+        });
+        infobox.setMap(map); //infobox埋め込み
+        // PinをClickしたときにInfobox表示させる
+        Microsoft.Maps.Events.addHandler(pin, "click", pushpinClicked);
+
+        // ref.on("value", function(data){
+        //     const path = firebase.database().ref("gs04-map-default-rtdb")
+        //     const k = path.key;
+        //     const v = data.val();
+        //     let list = [];
+        //     console.log(v);
+        //     console.log(k);
+
+            
+
+        //     data.forEach(function(children){
+        //         console.log(v.title);
+        //     })
+        //     // console.log(vk.title);
+        // });
+      }
+
+      //位置情報の取得に失敗した場合の処理
+      function mapsError(error) {
+        let e = "";
+        if (error.code == 1) {
+          //1＝位置情報取得が許可されてない（ブラウザの設定）
+          e = "位置情報が許可されてません";
+        }
+        if (error.code == 2) {
+          //2＝現在地を特定できない
+          e = "現在位置を特定できません";
+        }
+        ß;
+        if (error.code == 3) {
+          //3＝位置情報を取得する前にタイムアウトになった場合
+          e = "位置情報を取得する前にタイムアウトになりました";
+        }
+        alert("エラー：" + e);
+      }
+
+      //3.位置情報取得オプション
+      const set = {
+        enableHighAccuracy: true, //より高精度な位置を求める
+        maximumAge: 20000, //最後の現在地情報取得が20秒以内であればその情報を再利用する設定
+        timeout: 10000, //10秒以内に現在地情報を取得できなければ、処理を終了
+      };
+
+      //   -------------------------
+      //    Main:位置情報を取得する処理
+      //   -------------------------
+      function GetMap() {
+        navigator.geolocation.getCurrentPosition(mapsInit, mapsError, set);
+      }
+
+      //   検索ボタン実行処理
+      $("#search").on("click", function () {
+        const searchWord = $("#searchWord").val();
+        geocodeQuery(searchWord);
+      });
+
+      //　PushPinをClickしたときの処理
+      function pushpinClicked(e) {
+        // return new Promise(function (resolve, reject) {
+        //  入力フォームを表示
+        //pinがmetadataを持っている場合
+        if (e.target.metadata) {
+          //infoboxにmetadataをsetする
+          infobox.setOptions({
+            location: e.target.getLocation(),
+            title: e.target.metadata.title,
+            description: e.target.metadata.description,
+            visible: true,
+          });
+          // resolve;
+        } else {
+          $(".infoboxForm").fadeIn();
+        }
+        // });
+      }
+
+      //   背景をクリックするとモーダル閉じる
+      $(".modalclose").on("click", function () {
+        $(".infoboxForm").fadeOut();
+        return false;
+      });
+
+      // 登録ボタンを押すとピンにmetadata保存
+      $("#register").on("click", function () {
+        pin.metadata = {
+          location: pin.getLocation(),
+          title: $("#titleText").val(),
+          description: $("#descText").val(),
+        };
+        console.log(pin.metadata);
+        // DBに登録
+        ref.push(pin.metadata);
+        // フォームは閉じる
+        $(".infoboxForm").fadeOut();
+
+      });
+
+      // 　検索結果にピンをたてる処理（？？？要復習）
+      function geocodeQuery(query) {
+        //searchManagerモジュールのロード
+        if (!searchManager) {
+          //Create an instance of the search manager and call the geocodeQuery function again.
+          Microsoft.Maps.loadModule("Microsoft.Maps.Search", function () {
+            searchManager = new Microsoft.Maps.Search.SearchManager(map);
+            geocodeQuery(query);
+          });
+        } else {
+          let searchRequest = {
+            where: query,
+            callback: function (r) {
+              //検索結果にピンをたててZoom
+              if (r && r.results && r.results.length > 0) {
+                pin = new Microsoft.Maps.Pushpin(r.results[0].location);
+                Microsoft.Maps.Events.addHandler(pin, "click", pushpinClicked);
+                map.entities.push(pin);
+                map.setView({ bounds: r.results[0].bestView });
+              }
+            },
+            errorCallback: function (e) {
+              //エラー処理
+              alert("No results found.");
+            },
+          };
+          //geocodeリクエスト
+          searchManager.geocode(searchRequest);
+        }
+      }
+    </script>
+  </body>
+</html>
